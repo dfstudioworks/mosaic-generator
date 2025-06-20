@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,15 +25,33 @@ export default function ColorPaletteModal({
   colorPalette, 
   onColorPaletteChange 
 }: ColorPaletteModalProps) {
-  
+  const [colorCount, setColorCount] = useState(colorPalette.length || 24);
+  const [palette, setPalette] = useState<ColorPalette>([...colorPalette]);
+
+  useEffect(() => {
+    setPalette(prev => {
+      const next = [...prev];
+      if (colorCount > prev.length) {
+        return next.concat(Array(colorCount - prev.length).fill("#000000"));
+      } else {
+        return next.slice(0, colorCount);
+      }
+    });
+  }, [colorCount]);
+
   const handleColorChange = (index: number, color: string) => {
-    const newPalette = [...colorPalette];
+    const newPalette = [...palette];
     newPalette[index] = color;
-    onColorPaletteChange(newPalette as ColorPalette);
+    setPalette(newPalette as ColorPalette);
+  };
+
+  const handleSave = () => {
+    onColorPaletteChange(palette as ColorPalette);
+    onClose();
   };
 
   const handleResetPalette = () => {
-    onColorPaletteChange(defaultPalette);
+    setPalette(defaultPalette.slice(0, colorCount));
   };
 
   return (
@@ -41,15 +60,28 @@ export default function ColorPaletteModal({
         <DialogHeader>
           <DialogTitle className="flex items-center">
             <Palette className="w-5 h-5 mr-2 text-primary" />
-            24-Color Palette Editor
+            Custom Color Palette
           </DialogTitle>
         </DialogHeader>
-        
-        <div className="p-6">
-          <div className="grid grid-cols-6 gap-3 mb-6">
-            {colorPalette.map((color, index) => (
+
+        <div className="p-6 space-y-6">
+          {/* Color Count Input */}
+          <div>
+            <label className="text-sm font-medium block mb-1">Number of Colors:</label>
+            <Input
+              type="number"
+              min={1}
+              max={64}
+              value={colorCount}
+              onChange={(e) => setColorCount(parseInt(e.target.value))}
+            />
+          </div>
+
+          {/* Palette Color Pickers */}
+          <div className="grid grid-cols-6 gap-3">
+            {palette.map((color, index) => (
               <div key={index} className="text-center">
-                <div className="w-full aspect-square rounded-lg border-2 border-surface-300 cursor-pointer hover:border-primary transition-colors relative overflow-hidden">
+                <div className="w-full aspect-square rounded-lg border border-surface-300 hover:border-primary transition-colors relative overflow-hidden">
                   <Input
                     type="color"
                     value={color}
@@ -62,19 +94,13 @@ export default function ColorPaletteModal({
               </div>
             ))}
           </div>
-          
+
+          {/* Action Buttons */}
           <div className="flex space-x-3">
-            <Button 
-              variant="outline" 
-              onClick={handleResetPalette}
-              className="flex-1"
-            >
+            <Button variant="outline" onClick={handleResetPalette} className="flex-1">
               Reset to Default
             </Button>
-            <Button 
-              onClick={onClose}
-              className="flex-1"
-            >
+            <Button onClick={handleSave} className="flex-1">
               Save Palette
             </Button>
           </div>

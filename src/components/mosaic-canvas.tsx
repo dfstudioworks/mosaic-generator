@@ -28,22 +28,17 @@ export default function MosaicCanvas({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set canvas size
     const containerWidth = canvas.parentElement?.clientWidth || 800;
     const aspectRatio = mosaicData.gridDimensions.width / mosaicData.gridDimensions.height;
-    
     canvas.width = containerWidth;
     canvas.height = containerWidth / aspectRatio;
 
-    // Clear canvas
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Calculate tile dimensions
     const tileWidth = canvas.width / mosaicData.gridDimensions.width;
     const tileHeight = canvas.height / mosaicData.gridDimensions.height;
 
-    // Render mosaic
     for (let y = 0; y < mosaicData.gridDimensions.height; y++) {
       for (let x = 0; x < mosaicData.gridDimensions.width; x++) {
         const colorIndex = mosaicData.grid[y]?.[x];
@@ -52,18 +47,27 @@ export default function MosaicCanvas({
         const color = colorPalette[colorIndex];
         if (!color) continue;
 
-        const tileX = x * tileWidth;
-        const tileY = y * tileHeight;
+        let tileX = x * tileWidth;
+        let tileY = y * tileHeight;
+
+        if (settings.tileShape === 'triangle') {
+          const size = tileWidth;
+          const h = (Math.sqrt(3) / 2) * size;
+          tileX = x * size;
+          tileY = y * h;
+          if (y % 2 === 1) {
+            tileX += size / 2;
+          }
+        }
 
         ctx.save();
 
         if (previewMode === 'colored' || previewMode === 'split') {
           ctx.fillStyle = color;
-          drawTileShape(ctx, tileX, tileY, tileWidth, tileHeight, settings.tileShape);
+          drawTileShape(ctx, tileX, tileY, tileWidth, tileHeight, settings.tileShape, y, x);
         }
 
         if (previewMode === 'numbered' || previewMode === 'split') {
-          // Draw number
           ctx.fillStyle = previewMode === 'split' ? '#000000' : color;
           ctx.font = `${Math.min(tileWidth, tileHeight) * 0.6}px Arial`;
           ctx.textAlign = 'center';
@@ -86,40 +90,66 @@ export default function MosaicCanvas({
     y: number,
     width: number,
     height: number,
-    shape: string
+    shape: string,
+    row: number,
+    col: number
   ) => {
     ctx.beginPath();
-    
+
     switch (shape) {
-      case 'circle':
+      case 'circle': {
         const radius = Math.min(width, height) / 2;
-        ctx.arc(x + width / 2, y + height / 2, radius * 0.8, 0, 2 * Math.PI);
+        const xOffset = (row % 2) * radius;
+        ctx.arc(x + width / 2 + xOffset, y + height / 2, radius * 0.9, 0, 2 * Math.PI);
         break;
-      case 'triangle':
-        ctx.moveTo(x + width / 2, y + height * 0.1);
-        ctx.lineTo(x + width * 0.1, y + height * 0.9);
-        ctx.lineTo(x + width * 0.9, y + height * 0.9);
-        ctx.closePath();
-        break;
-      case 'hexagon':
-        const hexRadius = Math.min(width, height) / 2 * 0.8;
-        const centerX = x + width / 2;
-        const centerY = y + height / 2;
+      }
+
+      case 'hexagon': {
+        const radius = Math.min(width, height) / 2 * 0.9;
+        const w = radius * 2;
+        const h = Math.sqrt(3) * radius;
+        const xOffset = (row % 2) * (w * 0.5);
+        const cx = x + w * 0.75 * col + xOffset;
+        const cy = y + h * row * 0.5;
+
         for (let i = 0; i < 6; i++) {
-          const angle = (i * Math.PI) / 3;
-          const px = centerX + hexRadius * Math.cos(angle);
-          const py = centerY + hexRadius * Math.sin(angle);
+          const angle = Math.PI / 3 * i;
+          const px = cx + radius * Math.cos(angle);
+          const py = cy + radius * Math.sin(angle);
           if (i === 0) ctx.moveTo(px, py);
           else ctx.lineTo(px, py);
         }
         ctx.closePath();
         break;
+      }
+
+      case 'triangle': {
+        const size = Math.min(width, height);
+        const h = (Math.sqrt(3) / 2) * size;
+        const flip = (row + col) % 2 === 0;
+
+        if (flip) {
+          ctx.moveTo(x + size / 2, y);
+          ctx.lineTo(x, y + h);
+          ctx.lineTo(x + size, y + h);
+        } else {
+          ctx.moveTo(x, y);
+          ctx.lineTo(x + size / 2, y + h);
+          ctx.lineTo(x + size, y);
+        }
+        ctx.closePath();
+        break;
+      }
+
       default: // square
-        ctx.rect(x + 1, y + 1, width - 2, height - 2);
+        ctx.rect(x, y, width, height);
         break;
     }
-    
+
     ctx.fill();
+    ctx.strokeStyle = 'black';
+    ctx.lineWidth = 1;
+    ctx.stroke();
   };
 
   const handleZoomIn = () => {
@@ -156,8 +186,6 @@ export default function MosaicCanvas({
                 className="max-w-full max-h-full object-contain"
                 style={{ transformOrigin: 'center' }}
               />
-              
-              {/* Zoom Controls */}
               <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-2 flex space-x-1">
                 <Button variant="ghost" size="icon" onClick={handleZoomIn}>
                   <ZoomIn className="w-4 h-4" />
@@ -169,8 +197,6 @@ export default function MosaicCanvas({
                   <Maximize2 className="w-4 h-4" />
                 </Button>
               </div>
-
-              {/* Grid Info Overlay */}
               {mosaicData && (
                 <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-3">
                   <div className="text-sm space-y-1">
