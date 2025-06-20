@@ -1,9 +1,7 @@
 [build]
-  publish = "dist/public"
+  publish = "dist"
+  functions = "functions"
   command = "npm run build"
-
-[functions]
-  directory = "dist/functions"
 
 [[redirects]]
   from = "/api/*"
